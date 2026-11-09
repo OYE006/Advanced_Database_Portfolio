@@ -19,7 +19,7 @@ Expected result: securebank appears in the database list.
 
 ### Step 2: Creating the five tables
 
-Create a new SQL file in portfolio_1_database_design called schema.sql.
+Created a new SQL file in portfolio_1_database_design called schema.sql.
 
 Create in this order:
 
@@ -108,7 +108,7 @@ Execute the SQL from top to bottom. The order matters because some tables refere
                 REFERENCES transfers(transfer_id)
         );
 
-Understand the design:
+Understanding the design:
 
 - PRIMARY KEY: uniquely identifies each record.
 - FOREIGN KEY: prevents accounts or ledger entries from referencing nonexistent records.
@@ -117,13 +117,13 @@ Understand the design:
 - CHECK: constraints reject invalid amounts and negative account balances.
 - ENUM: restricts fields to the listed values.
 
-Confirm the tables exist by running:
+Confirming the tables exist by running:
 
     USE securebank;
     SHOW TABLES;
 
-### Step 3: Inserting the sample data
-Create sample_data.sql in the same folder.
+### Step 3: Inserting the customers data
+Creating sample_data.sql in portfolio_1_database_design.
 
 Execute and verify the simulated data:
 
@@ -150,7 +150,7 @@ Expected initial balances:
 - Account 1000000003: ₦25,000.00
 
 ### Step 4: Testing the database constraints
-Run the tests one at a time. Each invalid insert should fail.
+Running the tests one at a time. Each invalid insert should fail.
 
 Test A: Duplicate email
 
@@ -177,4 +177,99 @@ Test C: Invalid transfer amount
 Expected: the amount constraint rejects the record.
 
 ### Step 4: ER diagram
-In MySQL Workbench the diagram is exported as PNG or PDF. The generated diagram displays the primary keys, foreign keys, and relationships.
+In MySQL Workbench the diagram is exported as PNG. The generated diagram displays the primary keys, foreign keys, and relationships.
+
+
+## Portfolio 2: Query Processing and Optimisation
+
+### Step 1: Creating SQL query file
+Create queries.sql inside portfolio_2_query_optimisation.
+
+Query A: To Display customers and their accounts
+
+    SELECT
+        c.customer_id,
+        c.full_name,
+        a.account_number,
+        a.account_type,
+        a.balance,
+        a.currency,
+        a.status
+    FROM customers AS c
+    JOIN accounts AS a
+        ON a.customer_id = c.customer_id
+    ORDER BY c.full_name;
+
+This verify an inner join and sorting.
+
+Query B: Completed transfers retrieve for a specific account
+
+    SELECT
+        t.reference,
+        src.account_number AS source_account,
+        dst.account_number AS destination_account,
+        t.amount,
+        t.status,
+        t.created_at
+    FROM transfers AS t
+    JOIN accounts AS src
+        ON src.account_id = t.source_account_id
+    JOIN accounts AS dst
+        ON dst.account_id = t.destination_account_id
+    WHERE t.status = 'COMPLETED'
+      AND (
+          t.source_account_id = 1
+          OR t.destination_account_id = 1
+      )
+    ORDER BY t.created_at DESC;
+
+This verify multiple joins, filtering, and sorting.
+
+Query C: To Show total amount of completed transfers
+
+    SELECT
+        COUNT(*) AS transfer_count,
+        COALESCE(SUM(amount), 0.00) AS total_amount
+    FROM transfers
+    WHERE status = 'COMPLETED';
+
+This verify aggregation with COUNT, SUM, and COALESCE.
+
+Query D: Find accounts above a balance threshold
+
+    SELECT account_number, balance
+    FROM accounts
+    WHERE status = 'ACTIVE'
+      AND balance >= 50000.00
+    ORDER BY balance DESC;
+
+### Step 2: Comparing execution plans
+Executing the sql below before and after creating the index and saving both outputs.
+
+    EXPLAIN
+    SELECT transfer_id, amount, created_at
+    FROM transfers
+    WHERE status = 'COMPLETED'
+    ORDER BY created_at DESC;
+
+### Step 3: Creating indexes
+
+Create indexes.sql inside portfolio_2_query_optimisation and Execute:
+
+    CREATE INDEX idx_transfers_status_created
+        ON transfers(status, created_at);
+    
+    CREATE INDEX idx_transfers_source_created
+        ON transfers(source_account_id, created_at);
+    
+    CREATE INDEX idx_transfers_destination_created
+        ON transfers(destination_account_id, created_at);
+    
+    CREATE INDEX idx_ledger_account_created
+        ON ledger_entries(account_id, created_at);
+
+To confirm that the indexes exist,Execute:
+
+    SHOW INDEX FROM transfers;
+    SHOW INDEX FROM ledger_entries;
+
