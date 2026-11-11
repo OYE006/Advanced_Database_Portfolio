@@ -1,21 +1,32 @@
-# SecureBank Normalization
+\# SecureBank Normalization
 
-## Summary
 
-The SecureBank database separates customer details, bank accounts, transfers, ledger entries and audit events into five related tables. Each table has a primary key to identify each record, while foreign keys connect records that depend on one another. Unique constraints prevent duplicate email addresses, account numbers and transfer references. Check constraints reject negative account balances and invalid transaction amounts.
 
-## First Normal Form (1NF)
+\## Summary
 
-The tables use defined columns and single values rather than storing multiple customer emails, account numbers or transfer records in a single field. Each row has a primary key. 
+The database contains five(5) tables with each related to each other. There is a primary key to identify each individual record, while also having foreign keys to relate records which are dependent on each other. Unique constraints are applied to ensure no duplicates are present for emails, account numbers and transfer references. Check constraints are applied to ensure negative account balances and incorrect transaction amounts are denied. 
 
-## Second Normal Form (2NF)
 
-Each table uses a single-column primary key. So, no partial dependencies on only part of a composite primary key. The non-key attributes are designed to depend on the primary key.
 
-## Third Normal Form (3NF)
+\## First Normal Form (1NF):
 
-Customer information is stored in customers, not copied into account and transfer rows. Account information is stored in accounts, while transfer information and debit/credit ledger records are stored separately. This reduces duplication when customer details or transfer records change.
+As defined there are specific column names and each record only has one value, so there are no multiple emails, account numbers or transfers per customer. Each row has a primary key. 
 
-## Design considerations
 
-The balance stores the current account balance for efficient balance enquiries and must remain consistent with the ledger, while ledger_entries preserves the debit and credit records associated with transfers. 
+
+\## Second Normal Form (2NF):
+
+Each table has single column primary key, therefore there are no partial dependencies as there are no partial primary keys. Non-key attributes have been designed to be dependent on primary keys. 
+
+
+
+\## Third Normal Form (3NF):
+
+There is no duplication of customer information as it is stored in its own table. Account information is stored in its own table and transfer information is stored within its own table along with debit/credit ledger information. This avoids duplication if the customer information or transfer information changes. 
+
+
+
+\## Design Considerations
+
+The balance table allows quick look up of current account balance. It needs to be consistent with the ledger. The ledger\_entries table stores the debit/credit information associated with transfers.
+
