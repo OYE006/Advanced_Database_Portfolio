@@ -1,5 +1,0 @@
-# Performance Analysis: Query Processing and Optimisation
-
-The SecureBank SQL queries enable efficient retrieval and processing of relational data using joins, filtering, aggregation, and sorting. Indexes were implemented on transfer status, source account, destination account, and ledger account to support frequently executed queries. The EXPLAIN command helped examine query execution plans before and after indexing, with particular attention to index selection, estimated rows examined, and additional sorting operations.
-
-However, the small sample dataset may lead MySQL to prefer table scans over index scans, since scanning a small number of records can be less resource intensive. Consequently, a larger dataset is necessary to establish measurable performance improvements. Overall, this analysis demonstrates that appropriate indexing and query optimisation enhance database retrieval efficiency and underscores the importance of evaluating execution plans prior to drawing performance conclusions.
