@@ -1,34 +1,33 @@
 # Transactions and Concurrency
 
-## Objective
+How transactions work in MySQL using the InnoDB storage engine for the SecureBank database.
 
-This activity examines transaction processing and concurrency control in the SecureBank MySQL database using the InnoDB storage engine.
+## Transaction Processing
 
-## Transaction processing
+A stored procedure was created to move money between two accounts. The procedure will validate account IDs, check account status and balance, update both account’s balance and create a record of the transaction. Debit and credit entries were added to the ledger. The procedure includes transaction control using START TRANSACTION, COMMIT and exception handling to call ROLLBACK in the case of any SQL exceptions.
 
-A stored procedure was implemented to transfer funds between two accounts. It validates the account IDs, checks account status and available funds, updates both account balances, creates a transfer record and inserts corresponding debit and credit ledger entries.
+## Rollback
 
-The procedure uses `START TRANSACTION`, `COMMIT` and an exception handler that executes `ROLLBACK` if an SQL exception occurs.
+By reducing the account balance temporarily during a transaction and calling ROLLBACK we can see how it cancels any uncommitted changes.
 
-## Rollback demonstration
+## Isolation
 
-An account balance was temporarily reduced within a transaction. After executing `ROLLBACK`, the original balance was restored. This demonstrated how uncommitted changes can be cancelled.
+Looked at the isolation level of the session. The isolation level was set to REPEATABLE READ. By running two sessions we can see how the database will return consistent READ snapshots. Also ran an extra test using row locking to show how a second session will be forced to wait when a transaction has locked the account row.
 
-## Isolation and concurrency
+## ACID
 
-The session isolation level was examined and set to REPEATABLE READ. A two-session experiment demonstrated consistent snapshot reads and locking reads. A separate row-locking test showed how a second session waits when another transaction holds a lock on the same account row.
+Atomicity: The procedure contains the updating of balances and financial records in one transaction.
 
-## ACID evaluation
+Consistency: Constraints and validation ensures that the database cannot be corrupted by invalid account and transaction actions.
 
-- **Atomicity:** The transfer procedure groups balance updates and financial records into one transaction.
-- **Consistency:** Constraints and validation checks protect the database from invalid account and transfer operations.
-- **Isolation:** InnoDB transaction isolation and row-level locks coordinate concurrent access.
-- **Durability:** A successful commit makes the completed transaction persistent.
+Isolation: The InnoDB provides transaction isolation and row locking to manage concurrency.
 
-## Limitations and improvements
+Durability: If the transaction successfully commits then data is made persistent.
 
-The demonstration uses a small simulated dataset and a simplified transfer procedure. A production implementation would require stronger authorisation, idempotent processing, transaction limits, reconciliation, monitoring, backup and recovery procedures. Deadlocks and lock timeouts would also need application-level handling and controlled retries.
+## Limitations and Improvements
+
+This test uses a small sample data set and a simple transaction procedure. Additional security features would need to be included to authorise the user, ensure idempotency, limit the transaction and include reconciliation. Monitoring, back-up and recovery features would also be required. Deadlock and lock timeout would need to be handled at application level with limited retries.
 
 ## Conclusion
 
-The experiments demonstrate how MySQL transactions and concurrency controls help maintain consistent financial records when multiple database operations interact.
+This shows how transactions and concurrency controls in MySQL can help ensure consistent financial records when multiple database actions are being processed.
