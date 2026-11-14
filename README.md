@@ -273,3 +273,406 @@ To confirm that the indexes exist,Execute:
     SHOW INDEX FROM transfers;
     SHOW INDEX FROM ledger_entries;
 
+
+## Portfolio 3: Transactions and Concurrency
+
+A transfer requires debiting one account and crediting another without leaving the database in an inconsistent state.
+
+### Step 1: Transfer COMMIT
+A transfer using MySQL transaction control. It assumes the initial accounts still exist and account IDs 1 and 2 correspond to the data.
+
+
+        START TRANSACTION;
+        
+        SELECT account_id, balance
+        FROM accounts
+        WHERE account_id IN (1, 2)
+        ORDER BY account_id
+        FOR UPDATE;
+        
+        UPDATE accounts
+        SET balance = balance - 1000.00
+        WHERE account_id = 1
+          AND status = 'ACTIVE'
+          AND balance >= 1000.00;
+        
+        
+        UPDATE accounts
+        SET balance = balance + 1000.00
+        WHERE account_id = 2
+          AND status = 'ACTIVE';
+        
+        
+        INSERT INTO transfers
+            (source_account_id, destination_account_id,
+             amount, status, reference, description)
+        VALUES
+            (1, 2, 1000.00, 'COMPLETED',
+             'SB-TEST-0001', 'Portfolio transfer test');
+        
+        SET @transfer_id = LAST_INSERT_ID();
+        
+        INSERT INTO ledger_entries
+            (transfer_id, account_id, entry_type, amount)
+        VALUES
+            (@transfer_id, 1, 'DEBIT', 1000.00),
+            (@transfer_id, 2, 'CREDIT', 1000.00);
+        
+        COMMIT;
+        
+        SELECT account_id, account_number, balance
+        FROM accounts
+        WHERE account_id IN (1, 2);
+
+Expected balances after a successful ₦1,000 transfer:
+- Source account: ₦99,000.00
+- Destination account: ₦51,000.00
+
+The total remains ₦150,000.00 across those two accounts.
+
+### Step 2: Transfer ROLLBACK
+
+
+    START TRANSACTION;
+    
+    -- Return #1,000 to bank A
+    
+    UPDATE accounts
+    SET balance = balance + 1000.00
+    WHERE account_id = 1;
+    
+    -- Deduct #1,000 from bank B
+    
+    UPDATE accounts
+    SET balance = balance - 1000.00
+    WHERE account_id = 2;
+    
+    COMMIT;
+
+The account balance should return to its initial value, After ROLLBACK.
+
+### Step 3: Isolation
+
+- Check the configured level:
+
+        SELECT @@transaction_isolation;
+
+- Set the isolation level session
+    
+      SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+      
+        START TRANSACTION;
+        
+        SELECT balance
+        FROM accounts
+        WHERE account_id = 1;
+    
+        -- COMMIT or ROLLBACK after the experiment is complete.
+
+  ### Step 4: Concurrency
+
+  Using two separate MySQL Workbench query tabs connected to the same database.
+
+  Session A: acquiring a lock
+  
+        START TRANSACTION;
+        
+        SELECT balance
+        FROM accounts
+        WHERE account_id = 1
+        FOR UPDATE;
+
+  Leaving the transaction open temporarily.
+
+  Session B: requesting the same lock
+  
+        START TRANSACTION;
+        
+        SELECT balance
+        FROM accounts
+        WHERE account_id = 1
+        FOR UPDATE;
+
+  Session A holds the lock while session B wait
+
+Release and observe:
+
+Run COMMIT; in Session A. Session B should then be able to proceed. Finish Session B with COMMIT; or ROLLBACK;.
+
+## Portfolio 4: NoSQL and Advanced Data Models (MongoDB)
+
+MongoDB stores data in collections containing BSON documents, Unlike MySQL which stores data in tables with rows and columns.
+
+### Step 1: Creating the SecureBank database
+
+Open MongoDB Compass, then MongoDB Shell
+
+Execute: 
+
+    use SecureBank
+
+Create collections:
+
+    db.createCollection("customers")
+    db.createCollection("accounts")
+    db.createCollection("transactions")
+    db.createCollection("beneficiaries")
+    db.createCollection("audit_logs")
+
+Verifying the collections exist:
+
+    show collections
+
+Expected result:
+
+- accounts
+- audit_logs
+- beneficiaries
+- customers
+- transactions
+
+### Step 2: Inserting customer documents
+
+        db.customers.insertMany([
+          {
+            customer_id: "CUST001",
+            first_name: "Abdullahi",
+            last_name: "Oyeleye",
+            email: "abdullahi@example.com",
+            phone: "08012345678",
+            address: {
+              street: "Ikeja",
+              city: "Lagos",
+              country: "Nigeria"
+            },
+            status: "Active",
+            created_at: new Date()
+          },
+          {
+            customer_id: "CUST002",
+            first_name: "John",
+            last_name: "Ade",
+            email: "john@example.com",
+            phone: "08098765432",
+            address: {
+              street: "Yaba",
+              city: "Lagos",
+              country: "Nigeria"
+            },
+            status: "Active",
+            created_at: new Date()
+          }
+        ])
+
+Verifying: 
+
+    db.customers.find().pretty()
+
+MongoDB allows nested documents, such as the address object, to be stored within a customer document.
+
+### Step 3: Inserting bank account documents
+
+    db.accounts.insertMany([
+      {
+        account_id: "ACC001",
+        customer_id: "CUST001",
+        account_type: "Savings",
+        account_number: "1000000001",
+        currency: "NGN",
+        balance: 500000,
+        status: "Active",
+        created_at: new Date()
+      },
+      {
+        account_id: "ACC002",
+        customer_id: "CUST002",
+        account_type: "Current",
+        account_number: "1000000002",
+        currency: "NGN",
+        balance: 300000,
+        status: "Active",
+        created_at: new Date()
+      }
+    ])
+
+Verifying: 
+
+    db.accounts.find().pretty()
+
+### Step 4: Inserting transaction documents
+
+    db.transactions.insertMany([
+      {
+        transaction_id: "TXN001",
+        account_id: "ACC001",
+        transaction_type: "Deposit",
+        amount: 100000,
+        currency: "NGN",
+        status: "Successful",
+        description: "Initial deposit",
+        transaction_date: new Date()
+      },
+      {
+        transaction_id: "TXN002",
+        account_id: "ACC001",
+        transaction_type: "Transfer",
+        amount: 25000,
+        currency: "NGN",
+        status: "Successful",
+        description: "Transfer to ACC002",
+        transaction_date: new Date()
+      },
+      {
+        transaction_id: "TXN003",
+        account_id: "ACC002",
+        transaction_type: "Deposit",
+        amount: 50000,
+        currency: "NGN",
+        status: "Successful",
+        description: "Cash deposit",
+        transaction_date: new Date()
+      }
+    ])
+
+Verifying:
+
+    db.transactions.find().pretty()
+
+### Step 5: Inserting beneficiaries
+
+    db.beneficiaries.insertMany([
+      {
+        beneficiary_id: "BEN001",
+        customer_id: "CUST001",
+        beneficiary_name: "John Ade",
+        bank_name: "SecureBank",
+        account_number: "1000000002",
+        created_at: new Date()
+      }
+    ])
+
+Verifying:
+
+    db.beneficiaries.find().pretty()
+
+### Step 6: Creating indexes
+
+MongoDB supports indexes to improve query performance and enforce uniqueness.
+
+    db.customers.createIndex(
+      { customer_id: 1 },
+      { unique: true }
+    )
+    
+    db.customers.createIndex(
+      { email: 1 },
+      { unique: true }
+    )
+    
+    db.accounts.createIndex(
+      { account_id: 1 },
+      { unique: true }
+    )
+    
+    db.accounts.createIndex(
+      { account_number: 1 },
+      { unique: true }
+    )
+    
+    db.transactions.createIndex(
+      { transaction_id: 1 },
+      { unique: true }
+    )
+    
+    db.transactions.createIndex(
+      { account_id: 1, transaction_date: -1 }
+    )
+    
+    db.audit_logs.createIndex(
+      { customer_id: 1, timestamp: -1 }
+    )
+
+
+Verify the indexes:
+
+    db.customers.getIndexes()
+    db.accounts.getIndexes()
+    db.transactions.getIndexes()
+    db.audit_logs.getIndexes()
+
+### Step 7: Performing NoSQL queries
+
+These queries provide evidence that the database can retrieve and analyse banking information.
+
+Test 1: Finding a customer
+
+    db.customers.findOne({
+      customer_id: "CUST001"
+    })
+
+
+Test 2: Finding all accounts that belong to a customer
+
+    db.accounts.find({
+      customer_id: "CUST001"
+    })
+
+
+Test 3: Retrieving transactions for an account
+
+    db.transactions.find({
+      account_id: "ACC001"
+    }).sort({
+      transaction_date: -1
+    })
+
+
+Test 4: Finding successful transfers
+
+    db.transactions.find({
+      transaction_type: "Transfer",
+      status: "Successful"
+    })
+
+
+Test 5: Calculate total transaction
+
+    db.transactions.aggregate([
+      {
+        $match: {
+          status: "Successful"
+        }
+      },
+      {
+        $group: {
+          _id: "$transaction_type",
+          total_amount: {
+            $sum: "$amount"
+          },
+          transaction_count: {
+            $sum: 1
+          }
+        }
+      }
+    ])
+
+
+Test 6: Retrieve customer information with account details
+
+    db.customers.aggregate([
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "customer_id",
+          foreignField: "customer_id",
+          as: "customer_accounts"
+        }
+      }
+    ])
+
+
+This shows MongoDB's $lookup operation, which joins documents across collections.
+
+## Portfolio 5: Distributed and Cloud Database
+
+A proposed architecture and discussion based on secureBank case study, which also explains replication, sharding, availability, and consistency.
